@@ -350,6 +350,16 @@ void __attribute__((noreturn, noinline)) stm32wb_boot_enter(void)
     {
     }
 
+#if 0    
+    if (!(FLASH->SRRVR & FLASH_SRRVR_SBRSA))
+    {
+        PWR->CR4 |= PWR_CR4_C2BOOT;
+        PWR->CR4;
+
+        while (1);
+    }
+#endif
+    
     stm32wb_boot_application();
 }
 
@@ -2294,8 +2304,7 @@ static const stm32wb_application_info_t * __attribute__((noinline)) stm32wb_boot
 void __attribute__((noreturn, noinline)) stm32wb_boot_application(void)
 {
     const stm32wb_application_info_t *application_info;
-    uint32_t fwu_state;
-    uint32_t boot_dfu;
+    uint32_t flash_optr, fwu_state, boot_dfu;
 
     if (stm32wb_boot_info.pins.status != STM32WB_GPIO_PIN_NONE)
     {
@@ -2359,7 +2368,9 @@ void __attribute__((noreturn, noinline)) stm32wb_boot_application(void)
     stm32wb_boot_memcpy((uint8_t*)__boot_data_start__, (const uint8_t*)__boot_data_flash__, (uint32_t)__boot_data_end__ - (uint32_t)__boot_data_start__);
     stm32wb_boot_memset((uint8_t*)__boot_bss_start__, 0, (uint32_t)__boot_bss_end__ - (uint32_t)__boot_bss_start__);
 
-    if ((FLASH->OPTR & FLASH_OPTR_RDP) == 0xaa)
+    flash_optr = FLASH->OPTR;
+    
+    if ((flash_optr & FLASH_OPTR_RDP) == 0xaa)
     {
         stm32wb_boot_sha256_context_t sha256_ctx;
         uint32_t sha256_hash[STM32WB_BOOT_SHA256_HASH_SIZE / 4];
@@ -2377,19 +2388,33 @@ void __attribute__((noreturn, noinline)) stm32wb_boot_application(void)
 
         /* Add PCROP/WPROT, BOOT/PH3 and switch to RDP Level 1 if PROTECTED.
          */
+
+        flash_optr = ((flash_optr &
+                       ~(FLASH_OPTR_nBOOT0 | FLASH_OPTR_nSWBOOT0 | FLASH_OPTR_SRAM2RST | FLASH_OPTR_WWDG_SW | FLASH_OPTR_IWDG_STDBY | FLASH_OPTR_IWDG_SW | FLASH_OPTR_nRST_SHDW | FLASH_OPTR_nRST_STDBY | FLASH_OPTR_nRST_STOP)) |
+                      (FLASH_OPTR_nBOOT0 | FLASH_OPTR_nSWBOOT0 | FLASH_OPTR_SRAM2RST | FLASH_OPTR_WWDG_SW | FLASH_OPTR_IWDG_SW | FLASH_OPTR_nRST_SHDW | FLASH_OPTR_nRST_STDBY | FLASH_OPTR_nRST_STOP));
+
         if (((const stm32wb_application_vectors_t*)stm32wb_boot_vectors)->magic & STM32WB_BOOT_OPTION_PROTECTED)
         {
-            FLASH->KEYR      = 0x45670123;
-            FLASH->KEYR      = 0xcdef89ab;
+            flash_optr = (flash_optr & ~(FLASH_OPTR_nBOOT0 | FLASH_OPTR_nSWBOOT0 | FLASH_OPTR_RDP)) | (FLASH_OPTR_nBOOT0 | 0xbb);
+        }
+        
+        if (FLASH->OPTR != flash_optr)
+        {
+            FLASH->KEYR    = 0x45670123;
+            FLASH->KEYR    = 0xcdef89ab;
             
-            FLASH->OPTKEYR   = 0x08192a3b;
-            FLASH->OPTKEYR   = 0x4c5d6e7f;
+            FLASH->OPTKEYR = 0x08192a3b;
+            FLASH->OPTKEYR = 0x4c5d6e7f;
 
-            FLASH->OPTR      = (FLASH->OPTR & ~(FLASH_OPTR_nBOOT0 | FLASH_OPTR_nSWBOOT0 | FLASH_OPTR_RDP)) | (FLASH_OPTR_nBOOT0 | 0xbb);
-            FLASH->WRP1AR    = 0x00030000;            
-            FLASH->PCROP1ASR = 0x00000001;
-            FLASH->PCROP1AER = 0x80000007;
+            FLASH->OPTR    = flash_optr;
 
+            if (((const stm32wb_application_vectors_t*)stm32wb_boot_vectors)->magic & STM32WB_BOOT_OPTION_PROTECTED)
+            {
+                FLASH->WRP1AR    = 0x00030000;            
+                FLASH->PCROP1ASR = 0x00000001;
+                FLASH->PCROP1AER = 0x80000007;
+            }
+            
             __DSB();
             __ISB();
             
@@ -2401,13 +2426,10 @@ void __attribute__((noreturn, noinline)) stm32wb_boot_application(void)
             }
             
             FLASH->CR |= FLASH_CR_OBL_LAUNCH;
-            
-            __DSB();
-            __ISB();
-            
-            FLASH->CR |= (FLASH_CR_LOCK | FLASH_CR_OPTLOCK);
-            
-            stm32wb_boot_reset();
+
+            while (1)
+            {
+            }
         }
     }
     
@@ -2443,7 +2465,7 @@ void __attribute__((noreturn, noinline)) stm32wb_boot_application(void)
         }
 #endif /* (STM32WB_BOOT_DFU_CONFIG_WIRELESS == 1) */
 #endif /* (STM32WB_BOOT_DFU_CONFIG_STANDALONE == 1) */
-        
+
         stm32wb_boot_dfu(NULL);
     }
 
@@ -2454,13 +2476,13 @@ void __attribute__((noreturn, noinline)) stm32wb_boot_application(void)
         boot_dfu = stm32wb_boot_gpio_pin_read(stm32wb_boot_info.pins.dfu);
         
         stm32wb_boot_gpio_pin_configure(stm32wb_boot_info.pins.dfu, (STM32WB_GPIO_MODE_ANALOG));
-    
+        
         if (boot_dfu)
         {
             stm32wb_boot_dfu(application_info);
         }
     }
-
+    
     if (RCC->BDCR & RCC_BDCR_RTCEN)
     {
         if (RTC->BKP16R & STM32WB_RTC_BKP16R_DFU)
@@ -3611,8 +3633,7 @@ static uint32_t stm32wb_boot_fus_upgrade(uint32_t image_base, uint32_t image_siz
     
     if (((volatile uint32_t*)(image_base + STM32WB_BOOT_WIRELESS_PREFIX_OFFSET_STATUS))[0] == 0xffffffff)
     {
-        // fus_limit = 0x08000000 + (FLASH->SFR & FLASH_SFR_SFSA) * STM32WB_FLASH_PAGE_SIZE;
-        fus_limit = 0x080f4000;
+        fus_limit = 0x08000000 + (FLASH->SFR & FLASH_SFR_SFSA) * STM32WB_FLASH_PAGE_SIZE;
         
         if (fus_image->Magic == STM32WB_IPCC_FUS_MAGIC_FUS_IMAGE)
         {
@@ -3621,6 +3642,8 @@ static uint32_t stm32wb_boot_fus_upgrade(uint32_t image_base, uint32_t image_siz
                 return STM32WB_FWU_STATUS_ERR_FILE;
             }
 
+            // FIXME !!! This has changed for FUS 2.xxx
+            
             fus_base = 0x080ec000; // max 32k
         }
         else
@@ -3632,16 +3655,13 @@ static uint32_t stm32wb_boot_fus_upgrade(uint32_t image_base, uint32_t image_siz
                     return STM32WB_FWU_STATUS_ERR_FILE;
                 }
 
+                // FIXME !!! This has changed for FUS 2.xxx
+
                 fus_base = 0x080f0000; // max 16k
             }
             else
             {
-                fus_base = fus_limit - (fus_image->MemorySize & 0x000000ff) * STM32WB_FLASH_PAGE_SIZE;
-
-                if (fus_base < stm32wb_boot_info.wireless_base)
-                {
-                    return STM32WB_FWU_STATUS_ERR_FILE;
-                }
+                fus_base = stm32wb_boot_info.wireless_base;
             }
         }
 
@@ -3662,11 +3682,21 @@ static uint32_t stm32wb_boot_fus_upgrade(uint32_t image_base, uint32_t image_siz
         
         if (sys_info.WirelessStackMemorySize)
         {
-            if (!stm32wb_boot_fus_command(STM32WB_IPCC_SYS_OPCODE_FUS_FW_DELETE))
+            if ((sys_info.FusVersion & 0xffff0000) >= 0x02020000)
             {
-                return STM32WB_FWU_STATUS_ERR_INTERNAL;
+                if (!stm32wb_boot_fus_command(STM32WB_IPCC_SYS_OPCODE_FUS_FW_PURGE))
+                {
+                    return STM32WB_FWU_STATUS_ERR_INTERNAL;
+                }
             }
-
+            else
+            {
+                if (!stm32wb_boot_fus_command(STM32WB_IPCC_SYS_OPCODE_FUS_FW_DELETE))
+                {
+                    return STM32WB_FWU_STATUS_ERR_INTERNAL;
+                }
+            }
+            
             do
             {
                 stm32wb_boot_udelay(100000);

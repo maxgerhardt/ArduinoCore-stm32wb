@@ -23,8 +23,7 @@ void setup()
 
     OTA.begin();
     
-    BLE.begin(247);
-    BLE.setIncludeTxPowerLevel(true);
+    BLE.begin();
     BLE.setLocalName("STM32WB");
     BLE.setManufacturerData(manufacturer_data, sizeof(manufacturer_data));
 

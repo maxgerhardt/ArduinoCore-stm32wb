@@ -1,11 +1,11 @@
 /*****************************************************************************
  * @file    ble_const.h
- * @author  MDG
+ *
  * @brief   This file contains the definitions which are compiler dependent.
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2022 STMicroelectronics.
+ * Copyright (c) 2018-2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -44,6 +44,8 @@
 #define BEACON_ONLY 0
 #endif
 
+/* Defintion to determine BLE Host stack presence */
+#define BLE_HOST_PRESENT (!(LL_ONLY || LL_ONLY_BASIC || BEACON_ONLY))
 
 
 /* Size of command/events buffers:
@@ -51,8 +53,8 @@
  * To change the size of commands and events parameters used in the
  * auto-generated files, you need to update 2 defines:
  *
- *  - BLE_CMD_MAX_PARAM_LEN          
- *  - BLE_EVT_MAX_PARAM_LEN          
+ *  - BLE_CMD_MAX_PARAM_LEN
+ *  - BLE_EVT_MAX_PARAM_LEN
  *
  * These 2 defines are set below with default values and can be changed.
  *
@@ -96,6 +98,7 @@
  * Change this value if needed. */
 #define BLE_EVT_MAX_PARAM_LEN          HCI_EVENT_MAX_PARAM_LEN
 
+
 /* Callback function to send command and receive response */
 #define hci_request _stm32wb_ipcc_ble_command_t 
 
@@ -103,14 +106,14 @@ extern int hci_send_req( struct hci_request* req, bool async );
 
 
 /**
- * This function copies size number of bytes from a 
- * memory location pointed by src to a destination 
+ * This function copies size number of bytes from a
+ * memory location pointed by src to a destination
  * memory location pointed by dest
- * 
+ *
  * @param[in] dest Destination address
  * @param[in] src  Source address
- * @param[in] size size in the bytes  
- * 
+ * @param[in] size size in the bytes
+ *
  * @return  Address of the destination
  */
 
@@ -118,29 +121,28 @@ extern int hci_send_req( struct hci_request* req, bool async );
 
 /**
  * This function sets first number of bytes, specified
- * by size, to the destination memory pointed by ptr 
+ * by size, to the destination memory pointed by ptr
  * to the specified value
- * 
+ *
  * @param[in] ptr    Destination address
  * @param[in] value  Value to be set
- * @param[in] size   Size in the bytes  
- * 
+ * @param[in] size   Size in the bytes
+ *
  * @return  Address of the destination
  */
- 
+
 #define Osal_MemSet(_ptr, _value, _size) memset((_ptr), (_value), (_size))
 
 /**
  * This function compares n bytes of two regions of memory
- * 
+ *
  * @param[in] s1    First buffer to compare.
  * @param[in] s2    Second buffer to compare.
- * @param[in] size  Number of bytes to compare.   
- * 
+ * @param[in] size  Number of bytes to compare.
+ *
  * @return  0 if the two buffers are equal, 1 otherwise
  */
 #define Osal_MemCmp(_s1, _s2, _size) memcmp((_s1), (_s2), (_size))
-
 
 
 #ifndef FALSE
@@ -202,5 +204,3 @@ extern int hci_send_req( struct hci_request* req, bool async );
 #define NO_INIT(var)                    var  __attribute__((section(".noinit")))
 
 #endif /* BLE_CONST_H__ */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE***/

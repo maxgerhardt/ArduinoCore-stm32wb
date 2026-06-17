@@ -108,6 +108,7 @@
  */
 typedef struct _dosfs_sflash_device_t {
     uint8_t  state;
+    uint8_t  media;
     uint16_t block_count;
     uint16_t sector_count;
     uint32_t reclaim_offset; 
@@ -137,6 +138,28 @@ typedef struct _dosfs_sflash_device_t {
 
 static dosfs_sflash_device_t dosfs_sflash_device;
 
+static void dosfs_sflash_nor_enable()
+{
+    const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
+    
+    if (dosfs_sflash_device.state == DOSFS_SFLASH_STATE_NOT_READY) {
+        (*interface->enable)();
+
+        dosfs_sflash_device.state = DOSFS_SFLASH_STATE_READY;
+    }
+}
+
+static void dosfs_sflash_nor_disable()
+{
+    const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
+    
+    if (dosfs_sflash_device.state == DOSFS_SFLASH_STATE_READY) {
+        (*interface->disable)();
+
+        dosfs_sflash_device.state = DOSFS_SFLASH_STATE_NOT_READY;
+    }
+}
+
 static void dosfs_sflash_nor_acquire()
 {
     const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
@@ -156,6 +179,8 @@ static void dosfs_sflash_nor_erase(uint32_t offset)
     const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
 
     DOSFS_SFLASH_ASSERT((offset + DOSFS_SFLASH_BLOCK_SIZE) <= dosfs_sflash_device.data_size);
+
+    armv7m_rtt_printf("NOR-ERASE(%08x)\n", dosfs_sflash_device.data_start + offset);
     
     (*interface->erase)(dosfs_sflash_device.data_start + offset, NULL);
 
@@ -168,6 +193,8 @@ static void dosfs_sflash_nor_program(uint32_t offset, const uint8_t *data, uint3
 
     DOSFS_SFLASH_ASSERT((offset + size) <= dosfs_sflash_device.data_size);
 
+    armv7m_rtt_printf("NOR-PROGRAM(%08x, %d)\n", dosfs_sflash_device.data_start + offset, size);
+    
     (*interface->program)(dosfs_sflash_device.data_start + offset, data, size, NULL);
 
     while ((*interface->busy)()) { };
@@ -178,6 +205,8 @@ static void dosfs_sflash_nor_read(uint32_t offset, uint8_t *data, uint32_t size)
     const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
 
     DOSFS_SFLASH_ASSERT((offset + size) <= dosfs_sflash_device.data_size);
+
+    armv7m_rtt_printf("NOR-READ(%08x, %d)\n", dosfs_sflash_device.data_start + offset, size);
 
     (*interface->read)(dosfs_sflash_device.data_start + offset, data, size);
 }
@@ -1062,7 +1091,7 @@ static void dosfs_sflash_ftl_format()
     }
 }
 
-static bool dosfs_sflash_ftl_start()
+static bool dosfs_sflash_ftl_mount()
 {
     uint32_t offset, block, sector, slot, address, alloc_count, erase_count_max, reclaim_offset, reclaim_block, victim_offset, victim_erase_count, xlate_slot, xlate_entry;
     uint32_t *info_head, *info_tail, info_tag_data, info_tag;
@@ -1348,25 +1377,17 @@ static bool dosfs_sflash_ftl_start()
     return true;
 }
 
-static void dosfs_sflash_ftl_stop()
-{
-    const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
-    
-    (*interface->disable)();
-}
-
 static int dosfs_sflash_start(void *context, uint8_t *p_media, uint8_t *p_write_protected, uint32_t *p_block_count, uint32_t *p_au_size, uint32_t *p_serial)
 {
-    const stm32wb_sflash_interface_t *interface = dosfs_sflash_device.interface;
     int status = F_NO_ERROR;
 
-    if (dosfs_sflash_device.state <= DOSFS_SFLASH_STATE_NOT_READY)
+    if (dosfs_sflash_device.media == DOSFS_MEDIA_NONE)
     {
         status = F_ERR_ONDRIVE;
     }
     else
     {
-        (*interface->enable)();
+        dosfs_sflash_nor_enable();
         
         *p_media = DOSFS_MEDIA_SFLASH;
         *p_write_protected = false;
@@ -1382,8 +1403,8 @@ static int dosfs_sflash_stop(void *context, bool eject)
 {
     int status = F_NO_ERROR;
 
-    dosfs_sflash_ftl_stop();
-
+    dosfs_sflash_nor_disable();
+    
     return status;
 }
 
@@ -1397,8 +1418,6 @@ static int dosfs_sflash_format(void *context, uint32_t size)
     }
     else
     {
-        dosfs_sflash_ftl_stop();
-
 	if (size > dosfs_sflash_device.info->capacity)
 	{
 	    size = dosfs_sflash_device.info->capacity;
@@ -1429,23 +1448,27 @@ static int dosfs_sflash_format(void *context, uint32_t size)
 	}
 	else
 	{
+	    dosfs_sflash_nor_enable();
+
 	    dosfs_sflash_nor_acquire();
 
 	    dosfs_sflash_ftl_format();
 
-	    if (!dosfs_sflash_ftl_start())
+	    if (dosfs_sflash_ftl_mount())
 	    {
-		dosfs_sflash_device.state = DOSFS_SFLASH_STATE_NOT_READY;
-		
+                dosfs_sflash_device.media = DOSFS_MEDIA_SFLASH;
+            }
+            else
+            {
+                dosfs_sflash_device.media = DOSFS_MEDIA_NONE;
+                
 		status = F_ERR_ONDRIVE;
 	    }
-	    else
-	    {
-		dosfs_sflash_device.state = DOSFS_SFLASH_STATE_READY;
-	    }
-	}
 	
-        dosfs_sflash_nor_release();
+            dosfs_sflash_nor_release();
+
+            dosfs_sflash_nor_disable();
+	}
     }
     
     return status;
@@ -1580,7 +1603,7 @@ void dosfs_sflash_initialize(void)
 {
     uint32_t start, size;
 
-    if (dosfs_sflash_device.state == DOSFS_SFLASH_STATE_READY)
+    if (dosfs_sflash_device.state != DOSFS_SFLASH_STATE_NONE)
     {
 	return;
     }
@@ -1600,23 +1623,24 @@ void dosfs_sflash_initialize(void)
     dosfs_device.lock = DOSFS_DEVICE_LOCK_INIT;
     dosfs_device.context = (void*)&dosfs_sflash_device;
     dosfs_device.interface = &dosfs_sflash_interface;
-    
+
+    dosfs_sflash_device.state = DOSFS_SFLASH_STATE_NOT_READY;
     dosfs_sflash_device.serial = 0;
     dosfs_sflash_device.data_start = start;
     dosfs_sflash_device.data_size = size;
-    
+        
+    dosfs_sflash_nor_enable();
+
     dosfs_sflash_nor_acquire();
 
-    if (dosfs_sflash_ftl_start())
+    if (dosfs_sflash_ftl_mount())
     {
-	dosfs_sflash_device.state = DOSFS_SFLASH_STATE_READY;
+	dosfs_sflash_device.media = DOSFS_MEDIA_SFLASH;
     }
-    else
-    {
-	dosfs_sflash_device.state = DOSFS_SFLASH_STATE_NOT_READY;
-    }
-
+    
     dosfs_sflash_nor_release();
-        
+
+    dosfs_sflash_nor_disable();
+
     dosfs_device.lock = 0;
 }

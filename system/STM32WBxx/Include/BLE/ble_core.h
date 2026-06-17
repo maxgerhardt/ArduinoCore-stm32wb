@@ -1,11 +1,11 @@
 /*****************************************************************************
  * @file    ble_core.h
- * @author  MDG
+ *
  * @brief   This file contains the definitions for BLE stack
  *****************************************************************************
  * @attention
  *
- * Copyright (c) 2018-2022 STMicroelectronics.
+ * Copyright (c) 2018-2025 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -24,6 +24,7 @@
 
 /* BLE stack API definitions */
 #include "BLE/ble_defs.h"
+#include "BLE/ble_vs_codes.h"
 #include "BLE/ble_gap_aci.h"
 #include "BLE/ble_gatt_aci.h"
 #include "BLE/ble_hal_aci.h"

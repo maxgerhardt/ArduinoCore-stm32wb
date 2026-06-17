@@ -56,8 +56,7 @@ void setup()
     bme280_read_calibration_data();
     bme280_write_config();
 
-    BLE.begin(247);
-    BLE.setIncludeTxPowerLevel(true);
+    BLE.begin();
     BLE.setLocalName("STM32WB");
     BLE.setManufacturerData(manufacturer_data, sizeof(manufacturer_data));
 
@@ -110,9 +109,9 @@ void loop()
     temperatureFeature.timestamp = timestamp;
     temperatureFeature.temperature = (temperature * 10.0);
     
-    pressureCharacteristic.writeValue(pressureFeature);
-    humidityCharacteristic.writeValue(humidityFeature);
-    temperatureCharacteristic.writeValue(temperatureFeature);
+    pressureCharacteristic.notifyValue(pressureFeature);
+    humidityCharacteristic.notifyValue(humidityFeature);
+    temperatureCharacteristic.notifyValue(temperatureFeature);
 
     Serial.print("Pressure = ");
     Serial.print(pressure / 100);

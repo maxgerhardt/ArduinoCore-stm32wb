@@ -325,17 +325,12 @@ bool STM32WBClass::delay(uint32_t policy, uint32_t delay)
 
 void STM32WBClass::standby()
 {
-    standby(0xffffffff);
+    stm32wb_system_standby(0, 0xffffffff);
 }
 
 void STM32WBClass::standby(uint32_t timeout)
 {
     stm32wb_system_standby(0, timeout);
-}
-
-void STM32WBClass::standby(uint32_t pin, uint32_t mode)
-{
-    standby(pin, mode, 0xffffffff);
 }
 
 void STM32WBClass::standby(uint32_t pin, uint32_t mode, uint32_t timeout)

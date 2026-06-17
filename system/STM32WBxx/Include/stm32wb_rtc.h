@@ -118,11 +118,13 @@ typedef struct _stm32wb_rtc_alarm_t {
 #define STM32WB_RTC_BKP16R_DFU_MASK                   0x00000200
 #define STM32WB_RTC_BKP16R_DFU_SHIFT                  9
 #define STM32WB_RTC_BKP16R_DFU                        STM32WB_RTC_BKP16R_DFU_MASK                 
-  
+
 #define STM32WB_RTC_BKP17R_HSECLK_MASK                0x00000001
 #define STM32WB_RTC_BKP17R_HSECLK_SHIFT               0
 #define STM32WB_RTC_BKP17R_HSECLK                     STM32WB_RTC_BKP17R_HSECLK_MASK
-  
+#define STM32WB_RTC_BKP17R_STANDBY_TIMEOUT_MASK       0xfffffffe
+#define STM32WB_RTC_BKP17R_STANDBY_TIMEOUT_SHIFT      1
+
 #define STM32WB_RTC_BKP18R_SECONDS_OFFSET_MASK        0xffffffff
 #define STM32WB_RTC_BKP18R_SECONDS_OFFSET_SHIFT       0
 

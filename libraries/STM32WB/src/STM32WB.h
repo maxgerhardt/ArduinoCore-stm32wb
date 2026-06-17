@@ -44,9 +44,9 @@
 #define WAKEUP_PIN_3           0x00000004
 #define WAKEUP_PIN_4           0x00000008
 #define WAKEUP_PIN_5           0x00000010
-#define WAKEUP_TIMEOUT         0x00000100
+#define WAKEUP_PIN_RESET       0x00000100
 #define WAKEUP_WATCHDOG        0x00000200
-#define WAKEUP_RESET           0x00000400
+#define WAKEUP_TIMEOUT         0x00000400
 
 #define PANIC_CODE             0x0000ffff
 #define PANIC_SPURIOUS         0x00010000
@@ -113,7 +113,6 @@ public:
     static bool delay(uint32_t policy, uint32_t delay);
     static void standby();
     static void standby(uint32_t timeout);
-    static void standby(uint32_t pin, uint32_t mode);
     static void standby(uint32_t pin, uint32_t mode, uint32_t timeout);
     static void shutdown();
     static void shutdown(uint32_t pin, uint32_t mode);

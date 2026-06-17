@@ -37,6 +37,7 @@ LSRCS = \
 	armv7m_rtlib.S \
 	armv7m_rtos.c \
 	armv7m_rtt.c \
+	armv7m_sha256.c \
 	armv7m_svcall.c \
 	armv7m_systick.c \
 	dosfs_core.c \

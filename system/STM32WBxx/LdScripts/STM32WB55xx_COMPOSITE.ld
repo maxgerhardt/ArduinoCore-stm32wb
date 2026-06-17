@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2020 Thomas Roell.  All rights reserved.
+ * Copyright (c) 2008-2026 Thomas Roell.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -68,7 +68,9 @@ MEMORY
    SRAM        (rw)  : ORIGIN = 0x20000000, LENGTH = 0x00030000 /* SRAM1   192k                         */
    IPCC        (rw)  : ORIGIN = 0x20030000, LENGTH = 0x00001000 /* SRAM2a  4k                           */
    BBRAM       (rw)  : ORIGIN = 0x20031000, LENGTH = 0x00001800 /* SRAM2a  6k                           */
-   RTT         (rw)  : ORIGIN = 0x20039000, LENGTH = 0x00002800 /* SRAM2b  10k                          */
+   RTT         (rw)  : ORIGIN = 0x20039000, LENGTH = 0x00002000 /* SRAM2b  8k                           */
+   NVM         (rw)  : ORIGIN = 0x2003b000, LENGTH = 0x00000800 /* SRAM2b  2k                           */
+   FATAL       (rw)  : ORIGIN = 0x2003b800, LENGTH = 0x00000400 /* SRAM2b  1k                           */
 }
 
 GROUP(libgcc.a libc.a libm.a)
@@ -77,22 +79,26 @@ ENTRY(Reset_Handler)
 
 PHDRS
 {
-    boot_text   PT_LOAD  FLAGS(5);
-    boot_rodata PT_LOAD  FLAGS(4);
-    boot_stack  PT_NULL  FLAGS(6);
-    boot_data   PT_LOAD  FLAGS(6);
-    boot_bss    PT_NULL  FLAGS(6);
-    boot_noinit PT_NULL  FLAGS(6);
-    text        PT_LOAD  FLAGS(5);
-    rodata      PT_LOAD  FLAGS(4);
-    data        PT_LOAD  FLAGS(6);
-    bss         PT_NULL  FLAGS(6);
-    noinit      PT_NULL  FLAGS(6);
-    cctext      PT_LOAD  FLAGS(5);
-    ipcc        PT_NULL  FLAGS(6);
-    bbram       PT_NULL  FLAGS(6);
-    rtt         PT_NULL  FLAGS(6);
-    info        PT_LOAD  FLAGS(4);
+    boot_text    PT_LOAD  FLAGS(5);
+    boot_rodata  PT_LOAD  FLAGS(4);
+    boot_stack   PT_NULL  FLAGS(6);
+    boot_data    PT_LOAD  FLAGS(6);
+    boot_bss     PT_NULL  FLAGS(6);
+    boot_noinit  PT_NULL  FLAGS(6);
+    text         PT_LOAD  FLAGS(5);
+    rodata       PT_LOAD  FLAGS(4);
+    data         PT_LOAD  FLAGS(6);
+    bss          PT_NULL  FLAGS(6);
+    noinit       PT_NULL  FLAGS(6);
+    cctext       PT_LOAD  FLAGS(5);
+    ipcc         PT_NULL  FLAGS(6);
+    bbram_data   PT_LOAD  FLAGS(6);
+    bbram_bss    PT_NULL  FLAGS(6);
+    bbram_noinit PT_NULL  FLAGS(6);
+    rtt          PT_NULL  FLAGS(6);
+    nvm          PT_NULL  FLAGS(6);
+    fatal        PT_NULL  FLAGS(6);
+    info         PT_LOAD  FLAGS(4);
 }
 
 SECTIONS
@@ -282,6 +288,7 @@ SECTIONS
    {
        *(.noinit .noinit.*)
        . = ALIGN(8);
+     __noinit_end__ = .;
    } > SRAM :noinit
 
    __end__ = .;
@@ -315,13 +322,31 @@ SECTIONS
      __ipcc_end__ = .;
    } >IPCC :ipcc
 
-   .bbram (NOLOAD) :
+   .bbram_data :
    {
-     __bbram_start__ = .;
+     __bbram_data_start__ = .;
+       *(.bbram.data .bbram.data.*)
+       . = ALIGN(8);
+     __bbram_data_end__ = .;
+   } > BBRAM AT > APPLICATION :bbram_data
+
+   __bbram_data_flash__ = LOADADDR(.bbram_data);
+
+   .bbram_bss (NOLOAD) :
+   {
+     __bbram_bss_start__ = .;
+       *(.bbram.bss .bbram.bss.*)
+       . = ALIGN(8);
+     __bbram_bss_end__ = .;
+   } > BBRAM :bbram_bss
+
+   .bbram_noinit (NOLOAD) :
+   {
+       *(.bbram.noinit .bbram.noinit.*)
        *(.bbram .bbram.*)
        . = ALIGN(8);
-     __bbram_end__ = .;
-   } > BBRAM :bbram
+     __bbram_noinit_end__ = .;
+   } > BBRAM :bbram_noinit
 
    .cctext :
    {
@@ -338,7 +363,12 @@ SECTIONS
        KEEP(*(.rtt_control))
        KEEP(*(.rtt_data .rtt_data.*))
    } > RTT :rtt
-   
+
+   .fatal (NOLOAD) :
+   {
+       KEEP(*(.fatal .fatal.*))
+   } > FATAL :fatal
+
    .info : ALIGN(16)
    {
      __application_info__ = .;
@@ -361,6 +391,18 @@ SECTIONS
 
    __ccram_base__ = ORIGIN(CCRAM);
    __ccram_limit__ = ORIGIN(CCRAM) + LENGTH(CCRAM);
+
+   __ipcc_base__ = ORIGIN(IPCC);
+   __ipcc_limit__ = ORIGIN(IPCC) + LENGTH(IPCC);
+
+   __bbram_base__ = ORIGIN(BBRAM);
+   __bbram_limit__ = ORIGIN(BBRAM) + LENGTH(BBRAM);
+
+   __rtt_base__ = ORIGIN(RTT);
+   __rtt_limit__ = ORIGIN(RTT) + LENGTH(RTT);
+
+   __nvm_base__ = ORIGIN(NVM);
+   __nvm_limit__ = ORIGIN(NVM) + LENGTH(NVM);
 
    __application_base__ = ORIGIN(APPLICATION);
    __application_limit__ = ORIGIN(APPLICATION) + LENGTH(APPLICATION);

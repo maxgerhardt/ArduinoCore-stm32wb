@@ -36,7 +36,7 @@
 extern "C" {
 #endif
 
-#define STM32WB_EEPROM_SIZE 2048
+#define STM32WB_EEPROM_SIZE 1024
 
 extern void __stm32wb_eeprom_initialize(void);
 

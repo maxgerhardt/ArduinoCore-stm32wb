@@ -47,7 +47,7 @@ typedef struct _armv7m_rtt_control_t {
 } armv7m_rtt_control_t;
 
 static __attribute__((section(".rtt_control"), used)) armv7m_rtt_control_t armv7m_rtt_control;
-static __attribute__((section(".rtt_data"), used)) uint8_t armv7m_rtt_tx_data[10*1024 - sizeof(armv7m_rtt_control_t)];
+static __attribute__((section(".rtt_data"), used)) uint8_t armv7m_rtt_tx_data[8*1024 - sizeof(armv7m_rtt_control_t)];
 
 static const uint32_t armv7m_rtt_tx_data_size = sizeof(armv7m_rtt_tx_data);
 

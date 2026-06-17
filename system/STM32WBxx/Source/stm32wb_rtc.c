@@ -1411,7 +1411,7 @@ void stm32wb_rtc_standby(uint32_t timeout)
 {
     stm32wb_rtc_capture_t capture;
     stm32wb_rtc_tod_t tod;
-    uint32_t seconds, ticks;
+    uint64_t clock;
     
     /* Called with interrupts disabled.
      */
@@ -1424,17 +1424,16 @@ void stm32wb_rtc_standby(uint32_t timeout)
     
     if (timeout != 0xffffffff)
     {
-        if (timeout > 2419200000)
-        {
-            timeout = 2419200000;
-        }
-
-        seconds = timeout / 1000;
-        ticks = ((timeout - seconds * 1000) * STM32WB_RTC_CLOCK_TICKS_PER_SECOND + 999) / 1000;
-        
         __stm32wb_rtc_clock_capture(&capture);
-        __stm32wb_rtc_clock_convert(&capture, &tod);
-        __stm32wb_rtc_clock_offset(&tod, seconds, ticks);
+
+        clock = __stm32wb_rtc_clock_convert(&capture, &tod);
+
+        if (((uint32_t)(clock / STM32WB_RTC_CLOCK_TICKS_PER_SECOND) + timeout) > 0x7ffffff)
+        {
+            timeout = 0x7ffffff - (uint32_t)(clock / STM32WB_RTC_CLOCK_TICKS_PER_SECOND);
+        }
+        
+        __stm32wb_rtc_clock_offset(&tod, timeout, 0);
         
         while (!(RTC->ISR & RTC_ISR_ALRAWF))
         {
@@ -1452,6 +1451,9 @@ void stm32wb_rtc_standby(uint32_t timeout)
         RTC->ALRMASSR = ((STM32WB_RTC_PREDIV_S - 1) - tod.ticks) | STM32WB_RTC_ALRMSSR_MASKSS;
         
         RTC->CR |= (RTC_CR_ALRAIE | RTC_CR_ALRAE);
+
+	RTC->BKP17R = (RTC->BKP17R & ~STM32WB_RTC_BKP17R_STANDBY_TIMEOUT_MASK) | (timeout << STM32WB_RTC_BKP17R_STANDBY_TIMEOUT_SHIFT);
+        
     }
     
     /* Lock RTC throu reset */

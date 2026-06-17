@@ -36,6 +36,8 @@
  *        Definitions
  *----------------------------------------------------------------------------*/
 
+#define STM32WB_CONFIG_SFLASH             1
+
 #define STM32WB_CONFIG_BLE_LSE_SOURCE     BLE_LSE_SOURCE_MOD5MM
 
 #define USBCON

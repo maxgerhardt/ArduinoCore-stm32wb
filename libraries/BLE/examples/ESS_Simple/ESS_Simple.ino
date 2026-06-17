@@ -67,9 +67,9 @@ void loop()
     pressure = (uint32_t)(bme280_compensate_pressure((((uint32_t)bme280_data[0] << 12) | ((uint32_t)bme280_data[1] << 4) | ((uint32_t)bme280_data[2] >> 4)), t_fine) * 10.0);
     humidity = (uint16_t)(bme280_compensate_humidity((((uint32_t)bme280_data[6] << 8) | (uint32_t)bme280_data[7]), t_fine) * 100.0);
 
-    pressureCharacteristic.writeValue(pressure);
-    humidityCharacteristic.writeValue(humidity);
-    temperatureCharacteristic.writeValue(temperature);
+    pressureCharacteristic.notifyValue(pressure);
+    humidityCharacteristic.notifyValue(humidity);
+    temperatureCharacteristic.notifyValue(temperature);
 
     Serial.print("Pressure = ");
     Serial.print((float)pressure / 1000.0);

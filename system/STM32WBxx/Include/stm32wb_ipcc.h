@@ -36,7 +36,7 @@ extern "C" {
 #if !defined(__STM32WB_BOOT_CODE__)
 #define STM32WB_IPCC_BLE_SUPPORTED                              1
 #define STM32WB_IPCC_BLE_ACLDATA_SUPPORTED                      0
-#define STM32WB_IPCC_TRACE_SUPPORTED                            0
+#define STM32WB_IPCC_TRACE_SUPPORTED                            1
 #else /* !defined(__STM32WB_BOOT_CODE__) */
 #define STM32WB_IPCC_BLE_SUPPORTED                              0
 #define STM32WB_IPCC_BLE_ACLDATA_SUPPORTED                      0
@@ -56,6 +56,7 @@ extern "C" {
 #define STM32WB_IPCC_SYS_OPCODE_FUS_FW_UPGRADE                  0xfc54
 #define STM32WB_IPCC_SYS_OPCODE_FUS_FW_DELETE                   0xfc55
 #define STM32WB_IPCC_SYS_OPCODE_FUS_START_WS                    0xfc5a
+#define STM32WB_IPCC_SYS_OPCODE_FUS_FW_PURGE                    0xfc5b
 #define STM32WB_IPCC_SYS_OPCODE_BLE_INIT                        0xfc66
 #define STM32WB_IPCC_SYS_OPCODE_FLASH_ERASE_ACTIVITY            0xfc69
 #define STM32WB_IPCC_SYS_OPCODE_SET_FLASH_ACTIVITY_CONTROL      0xfc73
@@ -187,7 +188,7 @@ extern bool stm32wb_ipcc_fus_command(uint16_t opcode);
   
 #if !defined(__STM32WB_BOOT_CODE__)
   
-extern bool stm32wb_ipcc_sys_firmware(uint32_t version, uint32_t type, uint32_t address, const uint8_t *image, uint32_t size, const uint8_t *fus, const uint8_t *fus_for_0_5_3, uint32_t *p_code_return);
+extern bool stm32wb_ipcc_sys_firmware(uint32_t wireless_type, uint32_t wireless_version, uint32_t wireless_address, const uint8_t *wireless_image, uint32_t wireless_size, uint32_t fus_version, uint32_t fus_address, const uint8_t *fus_image, uint32_t fus_size, const uint8_t *fus_for_0_5_3, const uint8_t *fus_to_1_2_0, uint32_t *p_code_return);
 
 #if (STM32WB_IPCC_BLE_SUPPORTED == 1)
 
@@ -218,9 +219,8 @@ typedef struct __attribute__((packed)) _stm32wb_ipcc_ble_init_params_t {
     uint16_t MaxAdvDataLen;
     int16_t  TxPathCompensation;
     int16_t  RxPathCompensation;
-#if 0
     uint8_t  BleCoreVersion;
-#endif  
+    uint8_t  OptionsExt;
 } stm32wb_ipcc_ble_init_params_t;
   
 typedef void (*stm32wb_ipcc_ble_event_callback_t)(void *context);

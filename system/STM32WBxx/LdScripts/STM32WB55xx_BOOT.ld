@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2020 Thomas Roell.  All rights reserved.
+ * Copyright (c) 2008-2026 Thomas Roell.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -68,7 +68,9 @@ MEMORY
    SRAM        (rw)  : ORIGIN = 0x20000000, LENGTH = 0x00030000 /* SRAM1   192k                         */
    IPCC        (rw)  : ORIGIN = 0x20030000, LENGTH = 0x00001000 /* SRAM2a  4k                           */
    BBRAM       (rw)  : ORIGIN = 0x20031000, LENGTH = 0x00001800 /* SRAM2a  6k                           */
-   RTT         (rw)  : ORIGIN = 0x20039000, LENGTH = 0x00002800 /* SRAM2b  10k                          */
+   RTT         (rw)  : ORIGIN = 0x20039000, LENGTH = 0x00002000 /* SRAM2b  8k                           */
+   NVM         (rw)  : ORIGIN = 0x2003b000, LENGTH = 0x00000800 /* SRAM2b  2k                           */
+   FATAL       (rw)  : ORIGIN = 0x2003b800, LENGTH = 0x00000400 /* SRAM2b  1k                           */
 }
 
 ENTRY(stm32wb_boot_enter)
@@ -146,15 +148,30 @@ SECTIONS
        . += 76;
    } > BOOT :boot_text
 
-   __application_start__ = ORIGIN(APPLICATION);
-   __application_end__ = ORIGIN(APPLICATION) + LENGTH(APPLICATION);
+   __ccram_base__ = ORIGIN(CCRAM);
+   __ccram_limit__ = ORIGIN(CCRAM) + LENGTH(CCRAM);
 
-   __fwu_start__ = ORIGIN(FWU);
-   __fwu_end__ = ORIGIN(FWU) + LENGTH(FWU) - 4096;
+   __ipcc_base__ = ORIGIN(IPCC);
+   __ipcc_limit__ = ORIGIN(IPCC) + LENGTH(IPCC);
+
+   __bbram_base__ = ORIGIN(BBRAM);
+   __bbram_limit__ = ORIGIN(BBRAM) + LENGTH(BBRAM);
+
+   __rtt_base__ = ORIGIN(RTT);
+   __rtt_limit__ = ORIGIN(RTT) + LENGTH(RTT);
+
+   __nvm_base__ = ORIGIN(NVM);
+   __nvm_limit__ = ORIGIN(NVM) + LENGTH(NVM);
+
+   __application_base__ = ORIGIN(APPLICATION);
+   __application_limit__ = ORIGIN(APPLICATION) + LENGTH(APPLICATION);
+
+   __fwu_base__ = ORIGIN(FWU);
+   __fwu_limit__ = ORIGIN(FWU) + LENGTH(FWU) - 4096;
    __fwu_status__ = ORIGIN(FWU) + LENGTH(FWU);
 
-   __eeprom_start__ = ORIGIN(EEPROM);
-   __eeprom_end__ = ORIGIN(EEPROM) + LENGTH(EEPROM);
+   __eeprom_base__ = ORIGIN(EEPROM);
+   __eeprom_limit__ = ORIGIN(EEPROM) + LENGTH(EEPROM);
 
-   __wireless_start__ = ORIGIN(WIRELESS);
+   __wireless_base__ = ORIGIN(WIRELESS);
 }

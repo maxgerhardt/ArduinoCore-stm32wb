@@ -27,7 +27,7 @@ static const uint8_t manufacturer_data[6] = {
 
 void subscribedCallback() {
      if (ledCharacteristic.subscribed()) {
-         ledCharacteristic.writeValue(ledFeature);
+         ledCharacteristic.notifyValue(ledFeature);
      }
 }
 
@@ -47,7 +47,7 @@ void commandCallback() {
 
                 digitalWrite(LED_BUILTIN, (ledFeature.led != 0));
 
-                ledCharacteristic.writeValue(ledFeature);
+                ledCharacteristic.notifyValue(ledFeature);
             }
         }
     }
@@ -63,8 +63,7 @@ void setup() {
 
     OTA.begin();
     
-    BLE.begin(247);
-    BLE.setIncludeTxPowerLevel(true);
+    BLE.begin();
     BLE.setLocalName("STM32WB");
     BLE.setManufacturerData(manufacturer_data, sizeof(manufacturer_data));
 

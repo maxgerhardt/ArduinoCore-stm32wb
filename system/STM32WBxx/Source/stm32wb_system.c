@@ -76,6 +76,12 @@ extern uint8_t __cctext_flash__[];
 extern uint8_t __ccram_base__[];
 extern uint8_t __ccram_limit__[];
 
+extern uint8_t __bbram_data_start__[];
+extern uint8_t __bbram_data_end__[];
+extern uint8_t __bbram_data_flash__[];
+extern uint8_t __bbram_bss_start__[];
+extern uint8_t __bbram_bss_end__[];
+
 typedef struct _stm32wb_system_device_t {
     uint32_t                        options;
     uint32_t                        lseclk;
@@ -233,8 +239,8 @@ uint32_t __SECTION_NOINIT SystemCoreClock;
 void SystemInit(void)
 {
     uint32_t flash_acr;
-    volatile uint32_t *cctext, *cctext_e;
-    const uint32_t *cctext_f;
+    volatile uint32_t *cctext, *cctext_e, *bbram_data, *bbram_data_e, *bbram_bss, *bbram_bss_e;
+    const uint32_t *cctext_f, *bbram_data_f;
 
     RCC->CIER = 0x00000000;
 
@@ -255,7 +261,7 @@ void SystemInit(void)
     while (!(PWR->CR1 & PWR_CR1_DBP))
     {
     }
-    
+
 #if 0      
     if (RCC->BDCR & RCC_BDCR_RTCEN)
     {
@@ -282,20 +288,20 @@ void SystemInit(void)
         __stm32wb_system_reset_cause = STM32WB_SYSTEM_RESET_CAUSE_WAKEUP;
         __stm32wb_system_reset_reason = 0;
         __stm32wb_system_wakeup_reason = (PWR->SR1 & PWR_SR1_WUF);
-
-        if ((RCC->BDCR & RCC_BDCR_RTCEN) && (RTC->ISR & RTC_ISR_ALRAF))
+        
+        if (RCC->CSR & (RCC_CSR_BORRSTF | RCC_CSR_PINRSTF))
         {
-            __stm32wb_system_wakeup_reason |= STM32WB_SYSTEM_WAKEUP_REASON_TIMEOUT;
+            __stm32wb_system_wakeup_reason |= STM32WB_SYSTEM_WAKEUP_REASON_PIN_RESET;
         }
 
         if (RCC->CSR & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF))
         {
             __stm32wb_system_wakeup_reason |= STM32WB_SYSTEM_WAKEUP_REASON_WATCHDOG;
         }
-        
-        if (RCC->CSR & (RCC_CSR_BORRSTF | RCC_CSR_PINRSTF))
+
+        if ((RCC->BDCR & RCC_BDCR_RTCEN) && (RTC->ISR & RTC_ISR_ALRAF))
         {
-            __stm32wb_system_wakeup_reason |= STM32WB_SYSTEM_WAKEUP_REASON_RESET;
+            __stm32wb_system_wakeup_reason |= STM32WB_SYSTEM_WAKEUP_REASON_TIMEOUT;
         }
     }
     else
@@ -393,11 +399,39 @@ void SystemInit(void)
             *cctext++ = *cctext_f++;
         }
         while (cctext != cctext_e);
+
+        /* Write protect .cctext in SRAM2b */
+        SYSCFG->SWPR2 = (0xffffffff >> (32 - (((uint32_t)__cctext_end__ - (uint32_t)__cctext_start__ + 1023) / 1024))) << (((uint32_t)__ccram_base__ - SRAM2B_BASE + 1023) / 1024);
     }
 
-    /* Write protect .cctext in SRAM2b */
-    SYSCFG->SWPR2 = (0xffffffff >> (32 - (((uint32_t)__cctext_end__ - (uint32_t)__cctext_start__ + 1023) / 1024))) << (((uint32_t)__ccram_base__ - SRAM2B_BASE + 1023) / 1024);
-
+    if (__stm32wb_system_reset_cause != STM32WB_SYSTEM_RESET_CAUSE_WAKEUP)
+    {
+        if (&__bbram_data_start__[0] != &__bbram_data_end__[0])
+        {
+            bbram_data = (uint32_t*)&__bbram_data_start__[0];
+            bbram_data_e = (uint32_t*)&__bbram_data_end__[0];
+            bbram_data_f = (const uint32_t*)&__bbram_data_flash__[0];
+            
+            do
+            {
+                *bbram_data++ = *bbram_data_f++;
+            }
+            while (bbram_data != bbram_data_e);
+        }
+        
+        if (&__bbram_bss_start__[0] != &__bbram_bss_end__[0])
+        {
+            bbram_bss = (uint32_t*)&__bbram_bss_start__[0];
+            bbram_bss_e = (uint32_t*)&__bbram_bss_end__[0];
+            
+            do
+            {
+                *bbram_bss++ = 0x00000000;
+            }
+            while (bbram_bss != bbram_bss_e);
+        }
+    }
+    
     __armv7m_core_initialize();
 }
 
@@ -2467,7 +2501,8 @@ void stm32wb_system_sleep()
     if (!stm32wb_system_device.events)
     {
         policy = stm32wb_system_device.policy;
-
+#warning REMOVE ME        
+        policy = STM32WB_SYSTEM_POLICY_RUN;
         if (policy <= STM32WB_SYSTEM_POLICY_RUN)
         {
             while (!stm32wb_system_device.events)

@@ -22,12 +22,13 @@
 
 #if defined(ARDUINO_MAKEFILE)
 
-void setup() {
+void setup()
+{
 }
 
-void loop() {
+void loop()
+{
 }
-
 
 #endif
 
