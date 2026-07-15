@@ -22,10 +22,12 @@
 
 #if defined(ARDUINO_MAKEFILE)
 
-void setup(void) {
+void setup()
+{
 }
 
-void loop(void) {
+void loop()
+{
 }
 
 #endif
@@ -35,6 +37,7 @@ void loop(void) {
 void initVariant() __attribute__((weak));
 void initVariant() {
 }
+
 
 #if defined(USBCON)
 
@@ -52,6 +55,8 @@ void (*g_serialEventRun)(void) = NULL;
  * \brief Main entry point of Arduino application
  */
 int main( void ) {
+  __arduino_task = k_task_self();
+
   init();
   initVariant();
 

@@ -4,6 +4,8 @@
 
 BLEUart SerialBLE(BLE_UART_PROTOCOL_BLUEST);
 
+BLEOta OTA;
+
 static const uint8_t manufacturer_data[6] = {
     0x01,
     0x00,
@@ -19,12 +21,14 @@ void setup()
     
     while (!Serial) { }
 
+    OTA.begin();
+    
     BLE.begin();
-    BLE.setIncludeTxPowerLevel(true);
     BLE.setLocalName("STM32WB");
     BLE.setManufacturerData(manufacturer_data, sizeof(manufacturer_data));
 
     BLE.addService(SerialBLE);
+    BLE.addService(OTA);
     
     BLE.advertise();
 

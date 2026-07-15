@@ -36,16 +36,12 @@
  *        Definitions
  *----------------------------------------------------------------------------*/
 
-#define STM32WB_CONFIG_LSECLK             32774
-#define STM32WB_CONFIG_HSECLK             32000000
-#define STM32WB_CONFIG_SYSOPT             (STM32WB_SYSTEM_OPTION_SMPS_INDUCTOR_10uH | STM32WB_SYSTEM_OPTION_SMPS_CURRENT_220mA | STM32WB_SYSTEM_OPTION_USART1_SYSCLK | STM32WB_SYSTEM_OPTION_LSE_MODE_3)
-#define STM32WB_CONFIG_PIN_VBUS           STM32WB_GPIO_PIN_PVM1
-#define STM32WB_CONFIG_PIN_BUTTON         STM32WB_GPIO_PIN_PH3
 #define STM32WB_CONFIG_PIN_VBAT_SWITCH    STM32WB_GPIO_PIN_PD0
 #define STM32WB_CONFIG_VBAT_SENSE_CHANNEL STM32WB_ADC_CHANNEL_VBAT
 #define STM32WB_CONFIG_VBAT_SENSE_DELAY   10000
 #define STM32WB_CONFIG_VBAT_SENSE_PERIOD  STM32WB_ADC_VBAT_PERIOD
 #define STM32WB_CONFIG_VBAT_SENSE_SCALE   (1.27 * 3.0)
+#define STM32WB_CONFIG_SFLASH             1
 
 #define STM32WB_CONFIG_BLE_LSE_SOURCE     BLE_LSE_SOURCE_MOD5MM
 
@@ -99,7 +95,7 @@ static const uint8_t A1  = PIN_A1;
 static const uint8_t A2  = PIN_A2;
 static const uint8_t A3  = PIN_A3;
 static const uint8_t A4  = PIN_A4;
-static const uint8_t A5  = PIN_A4;
+static const uint8_t A5  = PIN_A5;
 #define ADC_RESOLUTION		12
 
 #define PIN_BUTTON           (23)

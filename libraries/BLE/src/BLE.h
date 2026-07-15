@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021 Thomas Roell.  All rights reserved.
+ * Copyright (c) 2020-2026 Thomas Roell.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -32,13 +32,30 @@
 #include <Arduino.h>
 #include <type_traits>
 
+#include "stm32wb_fwu.h"
+
 enum BLEOption : uint32_t {
-    BLE_OPTION_RANDOM_STATIC_ADDRESS                         = 0x00000001,
-    BLE_OPTION_PRIVACY                                       = 0x00000002,
-    BLE_OPTION_NO_SERVICE_CHANGED                            = 0x00000004,
-    BLE_OPTION_READ_ONLY_DEVICE_NAME                         = 0x00000008,
+    BLE_OPTION_ROLE_PERIPHERAL                               = 0x00000001,
+    BLE_OPTION_ROLE_BROADCASTER                              = 0x00000002,
+    BLE_OPTION_ROLE_CENTRAL                                  = 0x00000004,
+    BLE_OPTION_ROLE_OBSERVER                                 = 0x00000008,
+    BLE_OPTION_RANDOM_STATIC_ADDRESS                         = 0x00000010,
+    BLE_OPTION_PRIVACY                                       = 0x00000020,
 };
 
+enum BLEAddressType : uint8_t {
+    BLE_ADDRESS_TYPE_PUBLIC                                  = 0,
+    BLE_ADDRESS_TYPE_RANDOM_STATIC                           = 1,
+    BLE_ADDRESS_TYPE_RANDOM_PRIVATE_RESOLVABLE               = 2,
+    BLE_ADDRESS_TYPE_RANDOM_PRIVATE_NON_RESOLVABLE           = 3,
+    BLE_ADDRESS_TYPE_NONE                                    = 255
+};
+
+enum BLEUuidType : uint8_t {
+    BLE_UUID_TYPE_16                                         = 0,
+    BLE_UUID_TYPE_128                                        = 1,
+    BLE_UUID_TYPE_NONE                                       = 255
+};
 
 enum BLEAppearance : uint16_t {
     BLE_APPEARANCE_UNKNOWN                                   = 0,
@@ -96,23 +113,26 @@ enum BLEAdType : uint8_t {
     BLE_AD_TYPE_FLAGS                                        = 0x01,
     BLE_AD_TYPE_16_BIT_SERV_UUID                             = 0x02,
     BLE_AD_TYPE_16_BIT_SERV_UUID_CMPLT_LIST                  = 0x03,
-    BLE_AD_TYPE_32_BIT_SERV_UUID                             = 0x04,
-    BLE_AD_TYPE_32_BIT_SERV_UUID_CMPLT_LIST                  = 0x05,
     BLE_AD_TYPE_128_BIT_SERV_UUID                            = 0x06,
     BLE_AD_TYPE_128_BIT_SERV_UUID_CMPLT_LIST                 = 0x07,
     BLE_AD_TYPE_SHORTENED_LOCAL_NAME                         = 0x08,
     BLE_AD_TYPE_COMPLETE_LOCAL_NAME                          = 0x09,
     BLE_AD_TYPE_TX_POWER_LEVEL                               = 0x0a,
-    BLE_AD_TYPE_CLASS_OF_DEVICE                              = 0x0d,
-    BLE_AD_TYPE_SLAVE_CONN_INTERVAL                          = 0x12,
+    BLE_AD_TYPE_PERIPHERAL_CONN_INTERVAL                     = 0x12,
     BLE_AD_TYPE_SERV_SOLICIT_16_BIT_UUID_LIST                = 0x14,
     BLE_AD_TYPE_SERV_SOLICIT_128_BIT_UUID_LIST               = 0x15,
-    BLE_AD_TYPE_SERVICE_DATA                                 = 0x16,
+    BLE_AD_TYPE_SERVICE_DATA_16_BIT_UUID                     = 0x16,
     BLE_AD_TYPE_APPEARANCE                                   = 0x19,
-    BLE_AD_TYPE_ADVERTISING_INTERVAL                         = 0x1a,
-    BLE_AD_TYPE_LE_ROLE                                      = 0x1c,
-    BLE_AD_TYPE_SERV_SOLICIT_32_BIT_UUID_LIST                = 0x1f,
+    BLE_AD_TYPE_SERVICE_DATA_128_BIT_UUID                    = 0x21,
     BLE_AD_TYPE_MANUFACTURER_SPECIFIC_DATA                   = 0xff
+};
+
+enum BLEAdFlags : uint8_t {
+    BLE_AD_FLAGS_LE_LIMITED_DISCOVERABLE_MODE                = 0x01,
+    BLE_AD_FLAGS_LE_GENERAL_DISCOVERABLE_MODE                = 0x02,
+    BLE_AD_FLAGS_BR_EDR_NOT_SUPPORTED                        = 0x04,
+    BLE_AD_FLAGS_LE_BR_EDR_CONTROLLER                        = 0x08,
+    BLE_AD_FLAGS_LE_BR_EDR_HOST                              = 0x10
 };
 
 enum BLEProperty : uint8_t {
@@ -161,62 +181,169 @@ enum BLEDiscoverable : uint8_t {
     BLE_DISCOVERABLE_GENERAL                                 = 0x02,
 };
 
+enum BLEScanType : uint8_t {
+    BLE_SCAN_TYPE_PASSIVE                                    = 0x00,
+    BLE_SCAN_TYPE_ACTIVE                                     = 0x01,
+};
+
+enum BLEScanMode : uint8_t {
+    BLE_SCAN_MODE_NONE                                       = 0x00,
+    BLE_SCAN_MODE_WITHOUT_DUPLICATES                         = 0x01,
+    BLE_SCAN_MODE_CONNECTABLE                                = 0x02,
+    BLE_SCAN_MODE_FILTER_LIST                                = 0x04,
+};
+
+enum BLEScanEvent : uint8_t {
+    BLE_SCAN_EVENT_NONE                                      = 0x00,
+    BLE_SCAN_EVENT_ADVERTISEMENT                             = 0x01,
+    BLE_SCAN_EVENT_RESPONSE                                  = 0x02,
+    BLE_SCAN_EVENT_CONNECTABLE                               = 0x04,
+};
+
+enum BLEWriteType : uint8_t {
+    BLE_WRITE_TYPE_DEFAULT                                   = 0x00,
+    BLE_WRITE_TYPE_WITH_RESPONSE                             = 0x01,
+    BLE_WRITE_TYPE_WITHOUT_RESPONSE                          = 0x02,
+};
+
 enum BLEStatus : uint8_t {
     BLE_STATUS_SUCCESS                                       = 0,
     BLE_STATUS_FAILURE                                       = 1,
     BLE_STATUS_BUSY                                          = 255
 };
   
+enum BLEPayload : uint8_t {
+    BLE_PAYLOAD_PRBS9                                        = 0,
+    BLE_PAYLOAD_PATTERN_11110000                             = 1,
+    BLE_PAYLOAD_PATTERN_10101010                             = 2,
+    BLE_PAYLOAD_PRBS15                                       = 3,
+    BLE_PAYLOAD_PATTERN_11111111                             = 4,
+    BLE_PAYLOAD_PATTERN_00000000                             = 5,
+    BLE_PAYLOAD_PATTERN_00001111                             = 6,
+    BLE_PAYLOAD_PATTERN_01010101                             = 7,
+};
 
-class BLEDescriptor {
+#define BLE_ADDRESS_SIZE             6
+#define BLE_UUID_SIZE                16
+#define BLE_AD_SIZE                  31
+#define BLE_MAX_AD_LENGTH            29
+#define BLE_MIN_ATT_MTU              23
+#define BLE_MAX_ATT_MTU              247
+#define BLE_MIN_ATT_SIZE             20
+#define BLE_MAX_ATT_SIZE             244
+#define BLE_MIN_DEVICE_NAME_LENGTH   0
+#define BLE_MAX_DEVICE_NAME_LENGTH   244
+
+#define BLE_PASSKEY_UNDEFINED        0xffffffff
+
+class BLEAddress {
 public:
-    BLEDescriptor();
-    BLEDescriptor(const char *uuid, uint8_t permissions, const void *value, int valueLength);
-    BLEDescriptor(const char* uuid, uint8_t permissions, const char* value);
-    BLEDescriptor(const char* uuid, const char* value);
-    ~BLEDescriptor();
+    BLEAddress();
+    BLEAddress(const uint8_t data[BLE_ADDRESS_SIZE], BLEAddressType type);
+    BLEAddress(const char *string, BLEAddressType type);
 
-    BLEDescriptor(const BLEDescriptor &other);
-    BLEDescriptor &operator=(const BLEDescriptor &other);
-    BLEDescriptor(BLEDescriptor &&other);
-    BLEDescriptor &operator=(BLEDescriptor &&other);
+    operator bool() const;
+    bool operator==(const BLEAddress &other) const;
+    bool operator!=(const BLEAddress &other) const;
+  
+    BLEAddressType type() const;
+    const uint8_t *data() const;
+    int toString(char* string, int size, bool stripped = false) const;
+    String toString(bool stripped = false) const;
+    
+private:
+    BLEAddressType m_type;
+    uint8_t m_data[BLE_ADDRESS_SIZE];
+};
+
+class BLEUuid {
+public:
+    BLEUuid();
+    BLEUuid(uint16_t);
+    BLEUuid(const uint8_t data[BLE_UUID_SIZE]);
+    BLEUuid(const uint8_t data[], BLEUuidType type);
+    BLEUuid(const char *string);
+
+    operator bool() const;
+    bool operator==(const BLEUuid &other) const;
+    bool operator!=(const BLEUuid &other) const;
+  
+    BLEUuidType type() const;
+    const uint8_t *data() const;
+
+
+    int toString(char* string, int size, bool stripped = false) const;
+    String toString(bool stripped = false) const;
+    
+private:
+    BLEUuidType m_type;
+    uint8_t m_data[BLE_UUID_SIZE];
+};
+
+class BLEAdvertisingData {
+public:
+    BLEAdvertisingData();
+    BLEAdvertisingData(BLEAdFlags flags);
+    BLEAdvertisingData(const uint8_t data[], int length);
 
     operator bool() const;
 
-    const char *uuid() const;
-    uint8_t permissions() const;
+    int length() const;
+    const uint8_t *data() const;
 
-    int valueLength() const;
-    const void *value() const;
-    int getValue(void *value, int length) const;
+    bool setFlags(BLEAdFlags flags);
+    bool setTxPowerLevel(int tx_power_level);
+    bool setConnectionInterval(uint16_t interval_min, uint16_t interval_max);
+    bool setLocalName(const char *local_name);
+    bool setAppearance(BLEAppearance apperance);
+    bool setServiceUuid(const char *uuid);
+    bool setServiceUuid(const BLEUuid &uuid);
+    bool setServiceSolicitation(const char *uuid);
+    bool setServiceSolicitation(const BLEUuid &uuid);
+    bool setServiceData(const char *uuid, const uint8_t data[], int length);
+    bool setServiceData(const BLEUuid &uuid, const uint8_t data[], int length);
+    bool setManufacturerData(const uint8_t data[], int length);
+    bool setBeacon(const char *uuid, uint16_t major, uint16_t minor, int rssi);
+    bool setBeacon(const BLEUuid &uuid, uint16_t major, uint16_t minor, int rssi);
 
-protected:
-    BLEDescriptor(class BLEDescriptorInstance *instance);
-    class BLEDescriptorInstance *instance();
-
-    friend class BLEDescriptorInstance;
-    
+    bool getFlags(BLEAdFlags &flags);
+    bool getTxPowerLevel(int &tx_power_level);
+    bool getConnectionInterval(uint16_t &interval_min, uint16_t &interval_max);
+    bool getAppearance(BLEAppearance &apperance);
+    bool getLocalName(char *local_name, int size);
+    bool getServiceUuid(const char *uuid);
+    bool getServiceUuid(const BLEUuid &uuid);
+    bool getServiceUuids(BLEUuid uuid[], int size, int &count);
+    bool getServiceSolicitation(BLEUuid uuid[], int size, int &count);
+    bool getServiceData(BLEUuid &uuid, uint8_t data[], int size, int &length);
+    bool getManufacturerData(uint8_t data[], int size, int &length);
+    bool getBeacon(BLEUuid &uuid, uint16_t &major, uint16_t &minor, int &rssi);
+  
 private:
-    static BLEDescriptorInstance *instance(const char *uuid, uint8_t permissions, const void *value, int valueLength);
+    uint8_t m_length;
+    uint8_t m_data[BLE_AD_SIZE];
 
-    BLEDescriptorInstance *m_instance;
+    void clear();
+    int  contains(BLEAdType type) const;
+    bool add(BLEAdType type, const uint8_t data[], int length);
+    bool remove(BLEAdType type);
+    int  get(BLEAdType type, uint8_t data[], int size);
 
-public:
-    template<typename T>
-    typename std::enable_if<std::is_standard_layout<T>::value, int>::type
-    getValue(T& value) {
-        return getValue(reinterpret_cast<void*>(&value), sizeof(T));
-    }
+    friend class BLELocalDevice;
 };
-
 
 class BLECharacteristic {
 public:
     BLECharacteristic();
+    BLECharacteristic(class BLECharacteristicInterface *interface);
     BLECharacteristic(const char *uuid, uint8_t properties, uint8_t permissions, const void *value, int valueLength, int valueSize, bool fixedLength);
+    BLECharacteristic(const BLEUuid &uuid, uint8_t properties, uint8_t permissions, const void *value, int valueLength, int valueSize, bool fixedLength);
     BLECharacteristic(const char *uuid, uint8_t properties, uint8_t permissions, int valueSize, bool fixedLength);
+    BLECharacteristic(const BLEUuid &uuid, uint8_t properties, uint8_t permissions, int valueSize, bool fixedLength);
     BLECharacteristic(const char* uuid, uint8_t properties, uint8_t permissions, const char* value);
+    BLECharacteristic(const BLEUuid &uuid, uint8_t properties, uint8_t permissions, const char* value);
     BLECharacteristic(const char* uuid, uint8_t properties, const char* value);
+    BLECharacteristic(const BLEUuid &uuid, uint8_t properties, const char* value);
     ~BLECharacteristic();
 
     BLECharacteristic(const BLECharacteristic &other);
@@ -226,49 +353,46 @@ public:
     
     operator bool() const;
 
-    const char *uuid() const;
+    const BLEUuid uuid() const;
     uint8_t properties() const;
-    uint8_t permissions() const;
     bool fixedLength() const;
 
-    int valueSize() const;
-    int valueLength();
-    const void* value();
-    int getValue(void *value, int length);
+    int valueSize();
+    int getValue(void *value, int size);
 
     bool setValue(const void *value, int length);
 
-    bool writeValue(const void *value, int length);
-    bool writeValue(const void *value, int length, void(*callback)(void));
-    bool writeValue(const void *value, int length, Callback callback);
+    bool notifyValue(const void *value, int length);
+    bool notifyValue(const void *value, int length, void(*callback)(void));
+    bool notifyValue(const void *value, int length, Callback callback);
+
+    int readValue(void *value, int size);
+
+    bool writeValue(const void *value, int length, BLEWriteType writeType = BLE_WRITE_TYPE_DEFAULT);
+    bool writeValue(const void *value, int length, BLEWriteType writeType, void(*callback)(void));
+    bool writeValue(const void *value, int length, BLEWriteType writeType, Callback callback);
+
+    bool read();
+    bool read(void(*callback)(void));
+    bool read(Callback callback);
+    bool subscribe();
+    bool unsubscribe();
 
     uint8_t status();
     bool busy();
     bool written();
     bool subscribed();
-
-    unsigned int descriptorCount();
-    BLEDescriptor descriptor(unsigned int index);
-    bool addDescriptor(BLEDescriptor &descriptor);
-    bool removeDescriptor(BLEDescriptor &descriptor);
     
+    void onNotify(void(*callback)(void));
+    void onNotify(Callback callback);
     void onRead(void(*callback)(void));
     void onRead(Callback callback);
-    void onWritten(void(*callback)(void));
-    void onWritten(Callback callback);
-    void onSubscribed(void(*callback)(void));
-    void onSubscribed(Callback callback);
-  
-protected:
-    BLECharacteristic(class BLECharacteristicInstance *instance);
-    class BLECharacteristicInstance *instance();
+    void onWrite(void(*callback)(void));
+    void onWrite(Callback callback);
+    void onSubscribe(void(*callback)(void));
+    void onSubscribe(Callback callback);
 
-    friend class BLECharacteristicInstance;
-    
-private:
-    static BLECharacteristicInstance *instance(const char *uuid, uint8_t properties, uint8_t permissions, const void *value, int valueLength, int valueSize, bool fixedLength, bool constant);
-
-    BLECharacteristicInstance *m_instance;
+    inline class BLECharacteristicInterface *interface() const { return m_interface; };
 
 public:
     template<typename T>
@@ -276,9 +400,17 @@ public:
         BLECharacteristic(uuid, properties, 0, reinterpret_cast<const void*>(&value), sizeof(T), sizeof(T), false) { };
 
     template<typename T>
+    BLECharacteristic(const BLEUuid &uuid, uint8_t properties, const T& value) :
+        BLECharacteristic(uuid, properties, 0, reinterpret_cast<const void*>(&value), sizeof(T), sizeof(T), false) { };
+  
+    template<typename T>
     BLECharacteristic(const char *uuid, uint8_t properties, uint8_t permissions, const T& value) :
         BLECharacteristic(uuid, properties, permissions, reinterpret_cast<const void*>(&value), sizeof(T), sizeof(T), false) { };
-    
+
+    template<typename T>
+    BLECharacteristic(const BLEUuid &uuid, uint8_t properties, uint8_t permissions, const T& value) :
+        BLECharacteristic(uuid, properties, permissions, reinterpret_cast<const void*>(&value), sizeof(T), sizeof(T), false) { };
+  
     template<typename T>
     typename std::enable_if<std::is_standard_layout<T>::value, int>::type
     getValue(T& value) {
@@ -293,28 +425,59 @@ public:
     
     template<typename T>
     typename std::enable_if<std::is_standard_layout<T>::value, bool>::type
-    writeValue(const T& value) {
-        return writeValue(reinterpret_cast<const void*>(&value), sizeof(T));
+    notifyValue(const T& value) {
+        return notifyValue(reinterpret_cast<const void*>(&value), sizeof(T));
     }
 
     template<typename T>
     typename std::enable_if<std::is_standard_layout<T>::value, bool>::type
-    writeValue(const T& value, void(*callback)(void)) {
-        return writeValue(reinterpret_cast<const void*>(&value), sizeof(T), callback);
+    notifyValue(const T& value, void(*callback)(void)) {
+        return notifyValue(reinterpret_cast<const void*>(&value), sizeof(T), callback);
     }
 
     template<typename T>
     typename std::enable_if<std::is_standard_layout<T>::value, bool>::type
-    writeValue(const T& value, Callback callback) {
-        return writeValue(reinterpret_cast<const void*>(&value), sizeof(T), callback);
+    notifyValue(const T& value, Callback callback) {
+        return notifyValue(reinterpret_cast<const void*>(&value), sizeof(T), callback);
     }
+
+    template<typename T>
+    typename std::enable_if<std::is_standard_layout<T>::value, int>::type
+    readValue(T& value) {
+        return readValue(reinterpret_cast<void*>(&value), sizeof(T));
+    }
+  
+    template<typename T>
+    typename std::enable_if<std::is_standard_layout<T>::value, bool>::type
+    writeValue(const T& value, BLEWriteType writeType) {
+        return writeValue(reinterpret_cast<const void*>(&value), sizeof(T), writeType);
+    }
+  
+    template<typename T>
+    typename std::enable_if<std::is_standard_layout<T>::value, bool>::type
+    writeValue(const T& value, BLEWriteType writeType, void(*callback)(void)) {
+        return writeValue(reinterpret_cast<const void*>(&value), sizeof(T), writeType, callback);
+    }
+
+    template<typename T>
+    typename std::enable_if<std::is_standard_layout<T>::value, bool>::type
+    writeValue(const T& value, BLEWriteType writeType, Callback callback) {
+        return writeValue(reinterpret_cast<const void*>(&value), sizeof(T), writeType, callback);
+    }
+  
+private:
+    static BLECharacteristicInterface *construct(const BLEUuid &uuid, uint8_t properties, uint8_t permissions, const void *value, int valueLength, int valueSize, bool fixedLength, bool constant);
+
+    BLECharacteristicInterface *m_interface;
 };
 
 
 class BLEService {
 public:
     BLEService();
+    BLEService(class BLEServiceInterface *interface);
     BLEService(const char *uuid);
+    BLEService(const BLEUuid &uuid);
     ~BLEService();
 
     BLEService(const BLEService &other);
@@ -324,29 +487,27 @@ public:
     
     operator bool() const;
 
-    const char *uuid() const;
+    const BLEUuid uuid() const;
 
     unsigned int characteristicCount();
     BLECharacteristic characteristic(unsigned int index);
+    BLECharacteristic characteristic(const char *uuid);
+    BLECharacteristic characteristic(const BLEUuid &uuid);
     bool addCharacteristic(BLECharacteristic &characteristic);
-    bool removeCharacteristic(BLECharacteristic &characteristic);
 
-protected:
-    BLEService(class BLEServiceInstance *instance);
-    class BLEServiceInstance *instance();
-
-    friend class BLEServiceInstance;
-    
+    inline class BLEServiceInterface *interface() const { return m_interface; };
+  
 private:
-    static BLEServiceInstance *instance(const char *uuid);
-    
-    BLEServiceInstance *m_instance;
+    static BLEServiceInterface *construct(const BLEUuid &uuid);
+
+    BLEServiceInterface *m_interface;
 };
 
 
 class BLEDevice {
 public:
     BLEDevice();
+    BLEDevice(class BLEDeviceInterface *interface);
     ~BLEDevice();
 
     BLEDevice(const BLEDevice &other);
@@ -356,86 +517,140 @@ public:
     
     operator bool() const;
 
-    String address() const;
-    bool connected();
-    int rssi();
+    const BLEAddress address() const;
     int mtu();
 
-    bool setConnectionInterval(uint16_t minimumConnectionInterval, uint16_t maximumConnectionInterval);
-    bool setConnectionParameters(uint16_t minimumConnectionInterval, uint16_t maximumConnectionInterval, uint16_t slaveLatency);
-    bool setConnectionParameters(uint16_t minimumConnectionInterval, uint16_t maximumConnectionInterval, uint16_t slaveLatency, uint16_t supervisionTimeout);
-    void getConnectionParameters(uint16_t &connectionInterval, uint16_t &slaveLatency, uint16_t &supervisionTimeout); 
-    
-    void onConnectionUpdate(void(*callback)(void));
-    void onConnectionUpdate(Callback callback);
-    
-protected:
-    BLEDevice(class BLEDeviceInstance *instance);
-    class BLEDeviceInstance *instance();
+    void disconnect();
+    bool connected();
 
-    friend class BLEDeviceInstance;
+    bool discover();
+    bool discover(void(*callback)(void));
+    bool discover(Callback callback);
+    bool discoverServices();
+    bool discoverServices(void(*callback)(void));
+    bool discoverServices(Callback callback);
+    bool discoverCharacteristics(const char *uuid);
+    bool discoverCharacteristics(const char *uuid, void(*callback)(void));
+    bool discoverCharacteristics(const char *uuid, Callback callback);
+    bool discoverCharacteristics(const BLEUuid &uuid);
+    bool discoverCharacteristics(const BLEUuid &uuid, void(*callback)(void));
+    bool discoverCharacteristics(const BLEUuid &uuid, Callback callback);
+    bool discoverCharacteristics(BLEService service);
+    bool discoverCharacteristics(BLEService service, void(*callback)(void));
+    bool discoverCharacteristics(BLEService service, Callback callback);
+    unsigned int serviceCount();
+    BLEService service(unsigned int index);
+    BLEService service(const char *uuid);
+    BLEService service(const BLEUuid &uuid);
+
+    void getPhys(BLEPhy &tx_phy, BLEPhy &rx_phy);
+    bool setConnectionInterval(uint16_t interval_min, uint16_t interval_max);
+    bool setConnectionParameters(uint16_t interval_min, uint16_t interval_max, uint16_t latency);
+    bool setConnectionParameters(uint16_t interval_min, uint16_t interval_max, uint16_t latency, uint16_t timeout);
+    void getConnectionParameters(uint16_t &interval, uint16_t &latency, uint16_t &timeout); 
     
+    void onMTUExchange(void(*callback)(void));
+    void onMTUExchange(Callback callback);
+    void onConnectionParameters(void(*callback)(void));
+    void onConnectionParameters(Callback callback);
+    void onDisconnect(void(*callback)(void));
+    void onDisconnect(Callback callback);
+  
+    inline class BLEDeviceInterface *interface() const { return m_interface; };
+  
+protected:
+
 private:
-    BLEDeviceInstance *m_instance;
+    BLEDeviceInterface *m_interface;
 };
 
 
 class BLEClass {
 public:
-    static bool begin(int mtu = 23, uint32_t options = 0);
+    static bool begin();
+    static bool begin(uint32_t options);
+    static bool begin(uint32_t options, int mtu);
     static void end();
     
-    static String address();
-    
+    static const BLEAddress address();
+ 
+    // HCI / L2CAP
     static bool setTxPowerLevel(int txPower);
     static bool setPreferredPhy(BLEPhy txPhy, BLEPhy rxPhy, BLEPhyOption phyOptions = (BLEPhyOption)0);
+    static bool setConnectionInterval(uint16_t interval_min, uint16_t interval_max);
+    static bool setConnectionParameters(uint16_t interval_min, uint16_t interval_max, uint16_t latency);
+    static bool setConnectionParameters(uint16_t interval_min, uint16_t interval_max, uint16_t latency, uint16_t timeout);
 
-    // GAP/GATT Server: Standard Services/Attributes
-    static void setDeviceName(const char *deviceName);
-    static void setAppearance(BLEAppearance appearance);
-    static bool setConnectionInterval(uint16_t minimumConnectionInterval, uint16_t maximumConnectionInterval);
-    static bool setConnectionParameters(uint16_t minimumConnectionInterval, uint16_t maximumConnectionInterval, uint16_t slaveLatency);
-    static bool setConnectionParameters(uint16_t minimumConnectionInterval, uint16_t maximumConnectionInterval, uint16_t slaveLatency, uint16_t supervisionTimeout);
-    
-    // GATT Server: Custom Services
-    static unsigned int serviceCount();
-    static BLEService service(unsigned int index);
-    static bool addService(BLEService &service);
-    static bool removeService(BLEService &service);
+    // GAP Peripheral/Central
+    static bool setDeviceName(const char *deviceName);
+    static bool setAppearance(BLEAppearance appearance);
 
-    // GAP: Authentication
+    // GAP Peripheral
     static bool setSecurity(BLESecurity security);
+    static bool setPasskey(uint32_t passkey);
     static bool setBonding(bool bonding);
-    static bool setPin(const char *pin);
-    static void clearBondStorage();
-    
-    // GAP: Advertising
-    static bool setIncludeTxPowerLevel(bool enable);
-    static bool setIncludeConnectionInterval(bool enable);
-    static bool setLocalName(const char *localName);
-    static bool setAdvertisedServiceUuid(const char *uuid, bool complete = true);
-    static bool setAdvertisedServiceUuids(const char *uuid[], int count, bool complete = true);
-    static bool setManufacturerData(const uint8_t data[], int length);
-    static bool setBeacon(const char *uuid, uint16_t major, uint16_t minor, int8_t rssi);
-    static bool setAdvertisingData(const uint8_t data[], int length);
-    static bool setScanResponseData(const uint8_t data[], int length);
-
-    static bool setAdvertisingInterval(uint16_t advertisingInterval);
-    static bool setAdvertisingInterval(uint16_t minimumAdvertisingInterval, uint16_t maximumAdvertisingInterval);
     static void setConnectable(bool connectable);
     static void setDiscoverable(BLEDiscoverable discoverable);
-
+    static bool setAdvertisingInterval(uint16_t advertisingInterval);
+    static bool setAdvertisingInterval(uint16_t minimumAdvertisingInterval, uint16_t maximumAdvertisingInterval);
+    static bool setAdvertisingData(const BLEAdvertisingData &advertising_data);
+    static void setAdvertisingData();
+    static bool setScanResponseData(const BLEAdvertisingData &advertising_data);
+    static void setScanResponseData();
+    static bool setLocalName(const char *localName);
+    static bool setServiceUuid(const char *uuid);
+    static bool setServiceUuid(const BLEUuid &uuid);
+    static bool setServiceSolicitation(const char *uuid);
+    static bool setServiceSolicitation(const BLEUuid &uuid);
+    static bool setServiceData(const char *uuid, const uint8_t data[], int length);
+    static bool setServiceData(const BLEUuid &uuid, const uint8_t data[], int length);
+    static bool setManufacturerData(const uint8_t data[], int length);
+    static bool setBeacon(const char *uuid, uint16_t major, uint16_t minor, int rssi);
+    static bool setBeacon(const BLEUuid &uuid, uint16_t major, uint16_t minor, int rssi);
     static bool advertise();
     static void stopAdvertise();
     static bool advertising();
-    
-    // GAP: Peripheral 
     static BLEDevice central();
     static bool connected();
     static void disconnect();
 
+    // GAP Central
+    static bool setScanInterval(uint16_t scanInterval);
+    static bool setScanWindow(uint16_t scanWindow);
+    static void setScanType(BLEScanType scanType);
+    static bool setFilterList(const BLEAddress address[], int count);
+    static bool scan(uint8_t scanMode = BLE_SCAN_MODE_WITHOUT_DUPLICATES);
+    static void stopScan();
+    static bool scanning();
+    static unsigned int reportCount();
+    static bool report(BLEAddress &address, int &rssi, BLEScanEvent &event, BLEAdvertisingData &data);
+    static BLEDevice connect(BLEAddress address, uint32_t passkey = BLE_PASSKEY_UNDEFINED);
+    static BLEDevice connect(BLEAddress address, uint32_t passkey, void(*callback)(void));
+    static BLEDevice connect(BLEAddress address, uint32_t passkey, Callback callback);
+
+    // GATT Server
+    static bool activate();
+    static unsigned int serviceCount();
+    static BLEService service(unsigned int index);
+    static BLEService service(const char *uuid);
+    static BLEService service(const BLEUuid &uuid);
+    static bool addService(BLEService &service);
+
+    // Bond Storage
+    static int  queryBondStorage(BLEAddress address[], int count);
+    static bool removeBondStorage(const BLEAddress &address);
+    static bool clearBondStorage();
+  
+    //Test Mode
+    static bool testTransmit(int channel, int length, BLEPayload payload, BLEPhy phy = BLE_PHY_1M);
+    static bool testReceive(int channel, BLEPhy phy = BLE_PHY_1M, int modulation = 0);
+    static uint32_t testStop();
+    static bool testing();
+
     static void onStop(void(*callback)(void));
     static void onStop(Callback callback);
+    static void onReport(void(*callback)(void));
+    static void onReport(Callback callback);
     static void onConnect(void(*callback)(void));
     static void onConnect(Callback callback);
     static void onDisconnect(void(*callback)(void));
@@ -504,6 +719,89 @@ private:
     void transmit();
     void receive();
     void connect();
+};
+
+#define BLE_OTA_QUEUE_SIZE       4096
+
+enum BLEOtaOption : uint32_t {
+    BLE_OTA_OPTION_TRIAL                                     = 0x00000001,
+    BLE_OTA_OPTION_CANDIDATE                                 = 0x00000002,
+    BLE_OTA_OPTION_WIRELESS                                  = 0x00000004,
+};
+
+enum BLEOtaState : uint8_t {
+    BLE_OTA_STATE_READY                                      = 0x00,
+    BLE_OTA_STATE_BUSY                                       = 0x01,
+    BLE_OTA_STATE_FAILED                                     = 0x02,
+    BLE_OTA_STATE_TRIAL                                      = 0x03,
+    BLE_OTA_STATE_UPDATED                                    = 0x05,
+};
+
+class BLEOta : public BLEService {
+public:
+    BLEOta();
+    BLEOta(const BLEOta&) = delete;
+    BLEOta& operator=(const BLEOta&) = delete;
+
+    bool begin(uint32_t options = 0);
+
+    uint32_t state();
+
+    void accept();
+    void reject();
+    void allow();
+    void deny();
+    void confirm();
+    void cancel();
+
+    void onStart(void(*callback)(void));
+    void onStart(Callback callback);
+    void onFinish(void(*callback)(void));
+    void onFinish(Callback callback);
+    
+    
+private:
+    uint8_t                     m_busy;
+    uint8_t                     m_state;
+    uint8_t                     m_status;
+    uint8_t                     m_protocol;
+    uint8_t                     m_component;
+    volatile uint8_t            m_deny;
+    uint8_t                     m_options;
+    volatile uint8_t            m_sequence;
+
+    uint16_t                    m_head;
+    uint16_t                    m_tail;
+    uint32_t                    m_offset;
+    uint32_t                    m_size;
+    uint8_t                     m_data[BLE_OTA_QUEUE_SIZE];
+
+    k_work_t                    m_work;
+    stm32wb_fwu_request_t       m_request;
+
+    BLECharacteristic           m_command_characteristic;
+    BLECharacteristic           m_event_characteristic;
+    BLECharacteristic           m_data_characteristic;
+
+    Callback                    m_start_callback;
+    Callback                    m_finish_callback;
+    
+    static void                 acceptCallback(class BLEOta *self);
+    static void                 rejectCallback(class BLEOta *self);
+    static void                 beginCallback(class BLEOta *self);
+    static void                 startCallback(class BLEOta *self);
+    static void                 writeCallback(class BLEOta *self);
+    static void                 finishCallback(class BLEOta *self);
+    static void                 confirmCallback(class BLEOta *self);
+    static void                 rebootCallback();
+    static void                 cancelCallback(class BLEOta *self);
+    static void                 processCallback(class BLEOta *self);
+
+    void                        connectCallback();
+    void                        disconnectCallback();
+    void                        commandCallback();
+    void                        dataCallback();
+    void                        countCallback();
 };
 
 #endif // BLE_H
